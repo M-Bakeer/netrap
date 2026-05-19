@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>SOC Monitor</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:        #0a0c0f;
+            --panel:     #0f1318;
+            --border:    #1e2a35;
+            --accent:    #00e5ff;
+            --danger:    #ff3b3b;
+            --warn:      #ffaa00;
+            --success:   #00ff88;
+            --muted:     #3a4a57;
+            --text:      #c8d8e4;
+            --text-dim:  #5a7080;
+            --font-mono: 'Share Tech Mono', monospace;
+            --font-head: 'Orbitron', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: var(--font-mono);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg, transparent, transparent 2px,
+                rgba(0,229,255,0.012) 2px, rgba(0,229,255,0.012) 4px
+            );
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        /* Header */
+        .header {
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 36px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 14px; }
+
+        .header-logo {
+            width: 10px; height: 10px;
+            background: var(--accent);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent);
+            animation: blink 2s infinite;
+        }
+
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+        .header-title {
+            font-family: var(--font-head);
+            font-size: 1.2rem;
+            letter-spacing: 4px;
+            color: var(--accent);
+            text-shadow: 0 0 20px rgba(0,229,255,0.35);
+        }
+
+        .header-sub {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            letter-spacing: 2px;
+            margin-top: 2px;
+        }
+
+        .header-time {
+            font-family: var(--font-head);
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            letter-spacing: 3px;
+        }
+
+        /* Layout */
+        .main {
+            flex: 1;
+            padding: 24px 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        /* Panel */
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(0,229,255,0.02);
+        }
+
+        .panel-title {
+            font-family: var(--font-head);
+            font-size: 0.65rem;
+            letter-spacing: 3px;
+            color: var(--accent);
+        }
+
+        .panel-body { padding: 20px; }
+
+        /* Controls */
+        .controls { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+
+        .field { display: flex; flex-direction: column; gap: 6px; }
+
+        .field label {
+            font-size: 0.65rem;
+            letter-spacing: 2px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        .field input {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            padding: 8px 14px;
+            border-radius: 3px;
+            width: 150px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .field input:focus { border-color: var(--accent); }
+
+        .btn {
+            padding: 9px 22px;
+            font-family: var(--font-head);
+            font-size: 0.65rem;
+            letter-spacing: 2px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-start { background: var(--accent); color: var(--bg); }
+        .btn-start:hover { box-shadow: 0 0 16px rgba(0,229,255,0.5); }
+        .btn-stop  { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+        .btn-stop:hover  { background: rgba(255,59,59,0.08); }
+        .btn-clear { background: transparent; color: var(--text-dim); border: 1px solid var(--muted); font-family: var(--font-mono); font-size: 0.7rem; padding: 6px 14px; }
+        .btn-clear:hover { border-color: var(--text-dim); color: var(--text); }
+
+        /* Status */
+        .status-row {
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 18px;
+            padding: 8px 14px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+        }
+
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--muted);
+            flex-shrink: 0;
+        }
+
+        .status-dot.running {
+            background: var(--success);
+            box-shadow: 0 0 8px var(--success);
+            animation: blink 1.5s infinite;
+        }
+
+        .status-label { font-size: 0.72rem; letter-spacing: 1.5px; color: var(--text-dim); }
+        .status-label.running { color: var(--success); }
+
+        /* Stat boxes */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        @media (max-width: 900px) { .stats-grid { grid-template-columns: repeat(2,1fr); } }
+
+        .stat-box {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 16px 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-box::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 3px; height: 100%;
+            background: var(--accent);
+        }
+
+        .stat-box.danger::before { background: var(--danger); }
+        .stat-box.warn::before   { background: var(--warn); }
+        .stat-box.ok::before     { background: var(--success); }
+
+        .stat-label {
+            font-size: 0.62rem;
+            letter-spacing: 2px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-family: var(--font-head);
+            font-size: 1.5rem;
+            color: var(--accent);
+            margin-top: 6px;
+            line-height: 1;
+        }
+
+        .stat-box.danger .stat-value { color: var(--danger); }
+        .stat-box.warn   .stat-value { color: var(--warn); }
+        .stat-box.ok     .stat-value { color: var(--success); }
+
+        /* Two col */
+        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+        /* Protocol bars */
+        .proto-bars { display: flex; flex-direction: column; gap: 12px; }
+        .proto-row { display: flex; align-items: center; gap: 12px; }
+        .proto-name { width: 55px; font-size: 0.78rem; color: var(--text-dim); letter-spacing: 1px; }
+        .proto-track { flex: 1; height: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 2px; overflow: hidden; }
+        .proto-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease; width: 0%; }
+        .proto-fill.tcp   { background: var(--accent); }
+        .proto-fill.udp   { background: var(--warn); }
+        .proto-fill.icmp  { background: var(--success); }
+        .proto-fill.other { background: var(--muted); }
+        .proto-count { width: 50px; text-align: right; font-size: 0.78rem; color: var(--text-dim); }
+
+        /* Table */
+        .soc-table { width: 100%; border-collapse: collapse; }
+        .soc-table th { text-align: left; font-size: 0.62rem; letter-spacing: 2px; color: var(--text-dim); border-bottom: 1px solid var(--border); padding: 8px 12px; font-weight: normal; }
+        .soc-table td { padding: 10px 12px; font-size: 0.83rem; border-bottom: 1px solid rgba(30,42,53,0.4); }
+        .soc-table tr:last-child td { border-bottom: none; }
+        .soc-table td:last-child { color: var(--accent); }
+        .soc-table tr:hover td { background: rgba(0,229,255,0.02); }
+
+        .rank-badge {
+            display: inline-block;
+            width: 20px; height: 20px;
+            border-radius: 50%;
+            background: var(--border);
+            text-align: center;
+            line-height: 20px;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+        }
+
+        /* Alerts */
+        .alert-list { display: flex; flex-direction: column; gap: 8px; min-height: 50px; }
+
+        .alert-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: rgba(255,59,59,0.04);
+            border: 1px solid rgba(255,59,59,0.18);
+            border-left: 3px solid var(--danger);
+            border-radius: 3px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn { from{transform:translateX(-8px);opacity:0} to{transform:translateX(0);opacity:1} }
+
+        .alert-type { font-family: var(--font-head); font-size: 0.7rem; color: var(--danger); letter-spacing: 1px; }
+        .alert-detail { font-size: 0.78rem; color: var(--text-dim); margin-top: 4px; }
+        .alert-detail strong { color: var(--text); }
+
+        .alert-rate {
+            background: rgba(255,59,59,0.12);
+            border: 1px solid rgba(255,59,59,0.25);
+            color: var(--danger);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.72rem;
+            white-space: nowrap;
+            font-family: var(--font-head);
+        }
+
+        .no-data { color: var(--text-dim); font-size: 0.78rem; letter-spacing: 1px; padding: 6px 0; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="header-left">
+        <div class="header-logo"></div>
+        <div>
+            <div class="header-title">SOC MONITOR</div>
+            <div class="header-sub">NETWORK THREAT DETECTION SYSTEM</div>
+        </div>
+    </div>
+    <div class="header-time" id="clockDisplay">--:--:--</div>
+</div>
+
+<div class="main">
+
+    <!-- Control -->
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">CAPTURE CONTROL</span>
+        </div>
+        <div class="panel-body">
+            <div class="status-row">
+                <div class="status-dot" id="statusDot"></div>
+                <span class="status-label" id="statusText">OFFLINE — click START to begin monitoring</span>
+            </div>
+            <div class="controls">
+                <button class="btn btn-start" onclick="startMonitor()">▶ START</button>
+                <button class="btn btn-stop"  onclick="stopMonitor()">■ STOP</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+        <div class="stat-box">
+            <div class="stat-label">Total Packets</div>
+            <div class="stat-value" id="statPackets">0</div>
+        </div>
+        <div class="stat-box ok">
+            <div class="stat-label">Total Bytes</div>
+            <div class="stat-value" id="statBytes">0 B</div>
+        </div>
+        <div class="stat-box warn">
+            <div class="stat-label">Duration</div>
+            <div class="stat-value" id="statDuration">0s</div>
+        </div>
+        <div class="stat-box danger">
+            <div class="stat-label">Active Alerts</div>
+            <div class="stat-value" id="statAlerts">0</div>
+        </div>
+    </div>
+
+    <!-- Protocol + Talkers -->
+    <div class="two-col">
+        <div class="panel">
+            <div class="panel-header"><span class="panel-title">PROTOCOL DISTRIBUTION</span></div>
+            <div class="panel-body">
+                <div class="proto-bars">
+                    <div class="proto-row">
+                        <span class="proto-name">TCP</span>
+                        <div class="proto-track"><div class="proto-fill tcp" id="barTCP"></div></div>
+                        <span class="proto-count" id="cntTCP">0</span>
+                    </div>
+                    <div class="proto-row">
+                        <span class="proto-name">UDP</span>
+                        <div class="proto-track"><div class="proto-fill udp" id="barUDP"></div></div>
+                        <span class="proto-count" id="cntUDP">0</span>
+                    </div>
+                    <div class="proto-row">
+                        <span class="proto-name">ICMP</span>
+                        <div class="proto-track"><div class="proto-fill icmp" id="barICMP"></div></div>
+                        <span class="proto-count" id="cntICMP">0</span>
+                    </div>
+                    <div class="proto-row">
+                        <span class="proto-name">OTHER</span>
+                        <div class="proto-track"><div class="proto-fill other" id="barOTHER"></div></div>
+                        <span class="proto-count" id="cntOTHER">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header"><span class="panel-title">TOP TALKERS</span></div>
+            <div class="panel-body">
+                <table class="soc-table">
+                    <thead>
+                        <tr><th>#</th><th>IP ADDRESS</th><th>BYTES</th></tr>
+                    </thead>
+                    <tbody id="talkerBody">
+                        <tr><td colspan="3" class="no-data">— awaiting data —</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerts -->
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">⚠ THREAT ALERTS</span>
+            <button class="btn btn-clear" onclick="clearAlerts()">CLEAR</button>
+        </div>
+        <div class="panel-body">
+            <div class="alert-list" id="alertList">
+                <p class="no-data">— no threats detected —</p>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const API = 'http://localhost:5000';
+    let pollInterval = null;
+    let running = false;
+
+    function updateClock() {
+        document.getElementById('clockDisplay').textContent =
+            new Date().toLocaleTimeString('en-GB', { hour12: false });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function formatBytes(n) {
+        if (!n) return '0 B';
+        const units = ['B','KB','MB','GB'];
+        for (const u of units) {
+            if (n < 1024) return `${n.toFixed(1)} ${u}`;
+            n /= 1024;
+        }
+    }
+
+    function formatTime(sec) {
+        if (!sec) return '0s';
+        if (sec < 60) return `${Math.floor(sec)}s`;
+        return `${Math.floor(sec/60)}m ${Math.floor(sec%60)}s`;
+    }
+
+    function setStatus(isRunning) {
+        running = isRunning;
+        const dot  = document.getElementById('statusDot');
+        const text = document.getElementById('statusText');
+        dot.className  = 'status-dot' + (isRunning ? ' running' : '');
+        text.className = 'status-label' + (isRunning ? ' running' : '');
+        text.textContent = isRunning
+            ? 'LIVE — capturing traffic...'
+            : 'OFFLINE — click START to begin monitoring';
+    }
+
+    async function startMonitor() {
+        try {
+            const res  = await fetch(`${API}/start`, { method: 'POST' });
+            const data = await res.json();
+            if (data.status === 'started' || data.status === 'already_running') {
+                setStatus(true);
+                startPolling();   // resume polling in case it was stopped
+            }
+        } catch (e) {
+            alert('Cannot reach Flask API.\nRun: sudo python api.py');
+        }
+    }
+
+    async function stopMonitor() {
+        // Stop polling first so fetchAll doesn't race with reset
+        if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+        try { await fetch(`${API}/stop`, { method: 'POST' }); } catch (_) {}
+        setStatus(false);
+        resetUI();
+    }
+
+    function resetUI() {
+        renderedAlerts.clear();
+        document.getElementById('statPackets').textContent  = '0';
+        document.getElementById('statBytes').textContent    = '0 B';
+        document.getElementById('statDuration').textContent = '0s';
+        document.getElementById('statAlerts').textContent   = '0';
+        ['TCP','UDP','ICMP','OTHER'].forEach(p => {
+            document.getElementById(`bar${p}`).style.width = '0%';
+            document.getElementById(`cnt${p}`).textContent = '0';
+        });
+        document.getElementById('talkerBody').innerHTML =
+            `<tr><td colspan="3" class="no-data">— awaiting data —</td></tr>`;
+        document.getElementById('alertList').innerHTML =
+            `<p class="no-data">— no threats detected —</p>`;
+    }
+
+    function startPolling() {
+        if (pollInterval) clearInterval(pollInterval);   // always reset to avoid duplicates
+        pollInterval = setInterval(fetchAll, 1000);
+        fetchAll();
+    }
+
+    async function fetchAll() {
+        try {
+            const [sRes, aRes] = await Promise.all([
+                fetch(`${API}/stats`),
+                fetch(`${API}/alerts`)
+            ]);
+            const stats  = await sRes.json();
+            const alerts = await aRes.json();
+            updateStats(stats);
+            updateAlerts(alerts);
+            if (stats.running !== undefined) setStatus(stats.running);
+        } catch (_) {}
+    }
+
+    function updateStats(s) {
+        document.getElementById('statPackets').textContent  = (s.total_packets ?? 0).toLocaleString();
+        document.getElementById('statBytes').textContent    = formatBytes(s.total_bytes);
+        document.getElementById('statDuration').textContent = formatTime(s.duration);
+
+        const proto = s.proto_count || {};
+        const total = Object.values(proto).reduce((a, b) => a + b, 0) || 1;
+
+        ['TCP','UDP','ICMP','OTHER'].forEach(p => {
+            const c = proto[p] || 0;
+            document.getElementById(`bar${p}`).style.width = ((c / total) * 100) + '%';
+            document.getElementById(`cnt${p}`).textContent = c.toLocaleString();
+        });
+
+        const talkers = s.top_ips || [];
+        const tbody   = document.getElementById('talkerBody');
+        tbody.innerHTML = talkers.length === 0
+            ? `<tr><td colspan="3" class="no-data">— awaiting data —</td></tr>`
+            : talkers.map((t, i) => `
+                <tr>
+                    <td><span class="rank-badge">${i+1}</span></td>
+                    <td>${t.ip}</td>
+                    <td>${formatBytes(t.bytes)}</td>
+                </tr>`).join('');
+    }
+
+    // Track rendered alert keys to avoid re-animating on every poll
+    const renderedAlerts = new Set();
+
+    function alertKey(a) {
+        return a.type === 'port_scan'
+            ? `port_scan::${a.src}`
+            : `${a.type}::${a.src}::${a.dst}`;
+    }
+
+    function buildAlertEl(a) {
+        const time = new Date(a.time * 1000).toLocaleTimeString('en-GB', { hour12: false });
+        const key  = alertKey(a);
+        const div  = document.createElement('div');
+
+        if (a.type === 'port_scan') {
+            div.className = 'alert-item';
+            div.style.borderLeftColor = 'var(--warn)';
+            div.setAttribute('data-alert-key', key);
+            div.innerHTML = `
+                <div>
+                    <div class="alert-type" style="color:var(--warn);">⚠ PORT SCAN DETECTED</div>
+                    <div class="alert-detail">SRC: <strong>${a.src}</strong> &nbsp;|&nbsp; ${time}</div>
+                </div>
+                <span class="alert-rate" style="color:var(--warn);background:rgba(255,170,0,0.1);border-color:rgba(255,170,0,0.2);">SUSPICIOUS</span>`;
+        } else if (a.type === 'Packet Flood') {
+            div.className = 'alert-item';
+            div.setAttribute('data-alert-key', key);
+            div.innerHTML = `
+                <div>
+                    <div class="alert-type">⚠ PACKET FLOOD</div>
+                    <div class="alert-detail">SRC: <strong>${a.src}</strong> &nbsp;→&nbsp; DST: <strong>${a.dst || 'N/A'}</strong> &nbsp;|&nbsp; ${time}</div>
+                </div>
+                <span class="alert-rate" data-rate-key="${key}">${a.rate ?? 'FLOOD'} pkt/s</span>`;
+        } else {
+            div.className = 'alert-item';
+            div.setAttribute('data-alert-key', key);
+            div.innerHTML = `
+                <div>
+                    <div class="alert-type">⚠ ${(a.type || 'UNKNOWN').toUpperCase()}</div>
+                    <div class="alert-detail">SRC: <strong>${a.src}</strong> &nbsp;|&nbsp; ${time}</div>
+                </div>
+                <span class="alert-rate">${a.rate ?? ''}</span>`;
+        }
+        return div;
+    }
+
+    function updateAlerts(alerts) {
+        document.getElementById('statAlerts').textContent = alerts.length;
+        const list = document.getElementById('alertList');
+
+        if (alerts.length === 0) {
+            renderedAlerts.clear();
+            list.innerHTML = `<p class="no-data">— no threats detected —</p>`;
+            return;
+        }
+
+        // Remove placeholder if present
+        const placeholder = list.querySelector('.no-data');
+        if (placeholder) placeholder.remove();
+
+        const currentKeys = new Set(alerts.map(alertKey));
+
+        // Remove stale alerts that are no longer in the API response
+        renderedAlerts.forEach(key => {
+            if (!currentKeys.has(key)) {
+                const el = list.querySelector(`[data-alert-key]`);
+                if (el && el.getAttribute('data-alert-key') === key) el.remove();
+                renderedAlerts.delete(key);
+            }
+        });
+
+        // Add new alerts; update rate for existing Packet Flood entries
+        alerts.forEach(a => {
+            const key = alertKey(a);
+            if (!renderedAlerts.has(key)) {
+                list.prepend(buildAlertEl(a));
+                renderedAlerts.add(key);
+            } else if (a.type === 'Packet Flood' && a.rate != null) {
+                const rateEl = list.querySelector(`[data-rate-key="${key}"]`);
+                if (rateEl) rateEl.textContent = `${a.rate} pkt/s`;
+            }
+        });
+    }
+
+    async function clearAlerts() {
+        try { await fetch(`${API}/alerts`, { method: 'DELETE' }); } catch (_) {}
+        renderedAlerts.clear();
+        updateAlerts([]);
+    }
+
+    // Always poll on page load
+    (async () => {
+        try {
+            const res  = await fetch(`${API}/status`);
+            const data = await res.json();
+            if (data.running) setStatus(true);
+        } catch (_) {}
+        startPolling();
+    })();
+</script>
+</body>
+</html>
